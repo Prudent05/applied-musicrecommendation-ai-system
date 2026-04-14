@@ -11,13 +11,19 @@ Your goal is to:
 - Evaluate what your system gets right and wrong
 - Reflect on how this mirrors real world AI recommenders
 
-Replace this paragraph with your own summary of what your version does.
+This simulator builds a transparent, content-based music recommender that scores each song against a user taste profile, then ranks songs from best match to weakest match. It uses interpretable features from the catalog (genre, mood, energy, tempo, valence, danceability, acousticness) so we can see exactly why a song is recommended. The goal is not to copy Spotify scale, but to model the same core idea: convert taste signals into a numeric score and use that score to produce personalized suggestions.
 
 ---
 
 ## How The System Works
 
 Explain your design in plain language.
+
+Real platforms usually combine two strategies. Collaborative filtering predicts what you might like from behavior patterns of similar users (for example, co-listens, likes, skips, playlist overlap). Content-based filtering predicts from item attributes (for example, genre, mood, tempo, energy). This project prioritizes content-based logic so recommendations can be directly explained from song attributes.
+
+In this simulator, each song gets a single compatibility score made from weighted feature matches. Exact matches on genre and mood get strong boosts, while numeric attributes use a distance rule: songs closer to the user's target value score higher, and songs farther away score lower. For energy-like features, a simple closeness term such as $1 - |x - t|$ (with values normalized to $[0,1]$) rewards "near the target" instead of simply "higher" or "lower." Acoustic preference is handled as a conditional bonus depending on whether the user prefers acoustic sound.
+
+Scoring and ranking are separate on purpose. The scoring rule answers "How good is this one song for this one user?" The ranking rule answers "Out of all songs, which are best?" by sorting by score and returning the top $k$. This separation makes the system easier to debug, tune, and explain.
 
 Some prompts to answer:
 
@@ -26,6 +32,52 @@ Some prompts to answer:
 - What information does your `UserProfile` store
 - How does your `Recommender` compute a score for each song
 - How do you choose which songs to recommend
+
+Feature choices for this simulation:
+
+- `Song` features: `genre`, `mood`, `energy`, `tempo_bpm`, `valence`, `danceability`, `acousticness`
+- `UserProfile` features: `favorite_genre`, `favorite_mood`, `target_energy`, `likes_acoustic`
+
+Algorithm recipe (high level):
+
+- Add a weighted bonus for matching `genre`
+- Add a weighted bonus for matching `mood`
+- Add closeness points for `energy` using a distance-based score
+- Add smaller closeness points for `tempo_bpm`, `valence`, and `danceability`
+- Add or subtract points from `acousticness` based on `likes_acoustic`
+- Sort songs by total score (highest first) and return top recommendations
+
+Final weighted scoring recipe used in implementation:
+
+- `+2.0` for genre match (or custom weight override)
+- `+1.2` for mood match
+- `energy_score = 1.5 * (1 - abs(song_energy - target_energy))`
+- `tempo_score = 0.6 * (1 - min(abs(song_tempo - target_tempo) / 100, 1))`
+- `valence_score = 0.5 * (1 - abs(song_valence - target_valence))`
+- `danceability_score = 0.4 * (1 - abs(song_danceability - target_danceability))`
+- acoustic preference bonus: `+0.5 * acousticness` if `likes_acoustic=True`, else `+0.5 * (1 - acousticness)`
+
+Default user profile examples used in evaluation:
+
+- High-Energy Pop: `{"genre": "pop", "mood": "happy", "energy": 0.85, "tempo_bpm": 125, "valence": 0.8, "danceability": 0.82, "likes_acoustic": False}`
+- Chill Lofi: `{"genre": "lofi", "mood": "chill", "energy": 0.35, "tempo_bpm": 78, "valence": 0.58, "danceability": 0.58, "likes_acoustic": True}`
+- Deep Intense Rock: `{"genre": "rock", "mood": "intense", "energy": 0.92, "tempo_bpm": 148, "valence": 0.45, "danceability": 0.62, "likes_acoustic": False}`
+
+Data flow map:
+
+```mermaid
+flowchart LR
+  A[Input: User Preferences] --> B[Load songs.csv]
+  B --> C[Loop through each song]
+  C --> D[Compute weighted score + reasons]
+  D --> E[Store song, score, explanation]
+  E --> F[Rank all songs by score descending]
+  F --> G[Output top K recommendations]
+```
+
+Potential bias note:
+
+This system can over-prioritize exact genre matches, which may hide strong cross-genre songs that match mood and energy very well.
 
 You can include a simple diagram or bullet list if helpful.
 
@@ -74,6 +126,21 @@ Use this section to document the experiments you ran. For example:
 - What happened when you added tempo or valence to the score
 - How did your system behave for different types of users
 
+What I tested:
+
+- Added 8 new songs (IDs 11-18) to expand genre/mood diversity (classical, hip hop, metal, country, reggae, techno, rnb, folk).
+- Ran 3 profiles (High-Energy Pop, Chill Lofi, Deep Intense Rock).
+- Ran a sensitivity experiment where energy weight was doubled and genre weight was halved.
+
+Observed behavior:
+
+- High-Energy Pop: `Sunrise City` ranked first, with `Gym Hero` and `Rooftop Lights` near the top.
+- Chill Lofi: lofi tracks (`Library Rain`, `Midnight Coding`, `Focus Flow`) dominated as expected.
+- Deep Intense Rock: `Storm Runner` ranked first due to direct genre/mood match and close energy.
+- Weight-shift experiment changed ranking order by moving `Rooftop Lights` above `Gym Hero`, showing the recommender is sensitive to weight choices.
+
+Terminal screenshots were not auto-generated by this project; run `python -m src.main` and capture output from your terminal for submission artifacts.
+
 ---
 
 ## Limitations and Risks
@@ -100,6 +167,8 @@ Write 1 to 2 paragraphs here about what you learned:
 
 - about how recommenders turn data into predictions
 - about where bias or unfairness could show up in systems like this
+
+See `model_card.md` for the full model documentation and `reflection.md` for profile-by-profile comparison notes.
 
 
 ---
