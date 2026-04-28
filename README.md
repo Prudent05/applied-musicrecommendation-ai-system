@@ -259,17 +259,17 @@ This project reinforced that trustworthy AI is as much about evaluation and comm
 
 I also learned that transparent systems are easier to improve responsibly: when the model explains each decision component, failures become diagnosable rather than mysterious.
 
-## Loom Walkthrough (Required)
+## Demo Walkthrough
 
-Add your video link here before submission:
+Loom is not provided for this submission. A reproducible walkthrough is included here:
 
-- Loom walkthrough: `PASTE_YOUR_LOOM_LINK_HERE`
+- Walkthrough artifact: [assets/demo_walkthrough.md](assets/demo_walkthrough.md)
 
-Video should show:
-- end-to-end run with 2-3 inputs,
+It includes:
+- end-to-end run with 3 input profiles,
 - AI feature behavior (reliability + confidence output),
-- guardrail/evaluation behavior,
-- clear output per case.
+- guardrail evaluation case,
+- clear command/output evidence for each case.
 
 ## Portfolio Artifact
 
