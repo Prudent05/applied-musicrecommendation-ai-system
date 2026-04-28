@@ -2,6 +2,40 @@ from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
 import csv
 
+
+def _clamp01(value: float) -> float:
+    """Clamp numeric values to the normalized [0, 1] range."""
+    return max(0.0, min(1.0, value))
+
+
+def estimate_max_score(user_prefs: Dict) -> float:
+    """Estimate a practical upper bound used to convert score -> confidence."""
+    weights = user_prefs.get("weights", {})
+    genre_weight = float(weights.get("genre", 2.0))
+    mood_weight = float(weights.get("mood", 1.2))
+    energy_weight = float(weights.get("energy", 1.5))
+    tempo_weight = float(weights.get("tempo_bpm", 0.6))
+    valence_weight = float(weights.get("valence", 0.5))
+    danceability_weight = float(weights.get("danceability", 0.4))
+    acoustic_weight = float(weights.get("acousticness", 0.5))
+    return (
+        genre_weight
+        + mood_weight
+        + energy_weight
+        + tempo_weight
+        + valence_weight
+        + danceability_weight
+        + acoustic_weight
+    )
+
+
+def confidence_from_score(score: float, user_prefs: Dict) -> float:
+    """Map a recommendation score to [0,1] confidence for reporting."""
+    max_score = estimate_max_score(user_prefs)
+    if max_score <= 0:
+        return 0.0
+    return round(_clamp01(score / max_score), 3)
+
 @dataclass
 class Song:
     """
@@ -116,33 +150,33 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
         reasons.append(f"mood match (+{mood_weight:.1f})")
 
     # Numeric closeness: higher points when near user target
-    target_energy = float(user_prefs.get("energy", 0.5))
-    song_energy = float(song.get("energy", 0.5))
+    target_energy = _clamp01(float(user_prefs.get("energy", 0.5)))
+    song_energy = _clamp01(float(song.get("energy", 0.5)))
     energy_points = max(0.0, energy_weight * (1.0 - abs(song_energy - target_energy)))
     score += energy_points
     reasons.append(f"energy closeness (+{energy_points:.2f})")
 
-    target_tempo = float(user_prefs.get("tempo_bpm", 110.0))
-    song_tempo = float(song.get("tempo_bpm", 110.0))
+    target_tempo = max(0.0, float(user_prefs.get("tempo_bpm", 110.0)))
+    song_tempo = max(0.0, float(song.get("tempo_bpm", 110.0)))
     # Tempo scale is wider, so normalize by a broad window.
     tempo_points = max(0.0, tempo_weight * (1.0 - min(abs(song_tempo - target_tempo) / 100.0, 1.0)))
     score += tempo_points
     reasons.append(f"tempo closeness (+{tempo_points:.2f})")
 
-    target_valence = float(user_prefs.get("valence", 0.6))
-    song_valence = float(song.get("valence", 0.6))
+    target_valence = _clamp01(float(user_prefs.get("valence", 0.6)))
+    song_valence = _clamp01(float(song.get("valence", 0.6)))
     valence_points = max(0.0, valence_weight * (1.0 - abs(song_valence - target_valence)))
     score += valence_points
     reasons.append(f"valence closeness (+{valence_points:.2f})")
 
-    target_danceability = float(user_prefs.get("danceability", 0.65))
-    song_danceability = float(song.get("danceability", 0.65))
+    target_danceability = _clamp01(float(user_prefs.get("danceability", 0.65)))
+    song_danceability = _clamp01(float(song.get("danceability", 0.65)))
     danceability_points = max(0.0, danceability_weight * (1.0 - abs(song_danceability - target_danceability)))
     score += danceability_points
     reasons.append(f"danceability closeness (+{danceability_points:.2f})")
 
     likes_acoustic = bool(user_prefs.get("likes_acoustic", False))
-    acousticness = float(song.get("acousticness", 0.0))
+    acousticness = _clamp01(float(song.get("acousticness", 0.0)))
     if likes_acoustic:
         acoustic_points = acoustic_weight * acousticness
         score += acoustic_points
@@ -159,6 +193,9 @@ def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tup
     Functional implementation of the recommendation logic.
     Required by src/main.py
     """
+    if k <= 0:
+        return []
+
     scored_songs: List[Tuple[Dict, float, List[str]]] = []
 
     for song in songs:

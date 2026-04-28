@@ -1,86 +1,117 @@
-# 🎧 Model Card: Music Recommender Simulation
+# Model Card: VibeFinder CLI 2.0
 
 ## 1. Model Name
 
-VibeFinder CLI 1.0
-
----
+VibeFinder CLI 2.0 (Explainable Content-Based Music Recommender)
 
 ## 2. Intended Use
 
-This recommender suggests top songs from a small local CSV catalog using a single user taste profile.
-It is designed for classroom exploration of recommender system logic, not for production use.
-It assumes users can be represented by a few explicit preferences (genre, mood, energy, tempo, valence, danceability, acoustic preference).
+This system recommends top songs from a local catalog based on a user profile containing genre, mood, and numeric preference targets.
 
----
+Intended users:
+- students learning applied AI system design,
+- instructors evaluating reliability and explainability,
+- portfolio reviewers assessing practical AI engineering workflow.
 
-## 3. How the Model Works
+Out of scope:
+- production use at large scale,
+- high-stakes use cases,
+- personalized recommendations based on private behavioral history.
 
-Each song is compared to user preferences and gets a compatibility score.
-If genre matches, it gets a strong bonus. If mood matches, it gets a smaller bonus.
-Numeric features (energy, tempo, valence, danceability) are scored by closeness to the user target so near values are rewarded more than simply high values.
-Acousticness is handled as a preference bonus (higher if the user likes acoustic, lower otherwise).
-After scoring all songs, the recommender sorts by score and returns top-k tracks with explanation strings.
+## 3. System Type and AI Behavior
 
----
+This is a **specialized rule-based AI recommender** with explicit weighted scoring.
+
+Behavior summary:
+- categorical matching: genre and mood boosts,
+- numeric closeness scoring: energy, tempo, valence, danceability,
+- preference logic: acoustic vs non-acoustic bonus,
+- ranked top-k outputs with human-readable explanations.
 
 ## 4. Data
 
-The catalog contains 18 songs in `data/songs.csv`.
-I started with the 10-song starter set and added 8 songs.
-Genres now include pop, lofi, rock, ambient, jazz, synthwave, indie pop, classical, hip hop, metal, country, reggae, techno, rnb, and folk.
-Moods include happy, chill, intense, relaxed, moody, focused, calm, confident, aggressive, warm, uplifting, euphoric, soulful, and nostalgic.
-The dataset is still small and does not include lyrics, language, cultural context, or listening history.
+Source: `data/songs.csv`
 
----
+Dataset properties:
+- 18 songs total,
+- multiple genres and moods,
+- structured numeric features normalized to recommender expectations.
 
-## 5. Strengths
+Known data limitations:
+- small catalog size,
+- no lyrics/language/cultural metadata,
+- no user interaction history,
+- no external knowledge retrieval.
 
-The recommender works well when the user profile has clear genre and mood targets.
-It gave intuitive top picks for the tested profiles:
-- High-Energy Pop: Sunrise City and Gym Hero scored high.
-- Chill Lofi: Library Rain and Midnight Coding scored high.
-- Deep Intense Rock: Storm Runner scored highest.
-The explanations make results transparent because each recommendation includes score reasons.
+## 5. Evaluation and Reliability
 
----
+Evaluation methods used:
+- automated unit tests (`python -m pytest -q`),
+- reliability harness (`python -m src.evaluate`) with predefined checks,
+- out-of-range input test for guardrail validation.
 
-## 6. Limitations and Bias
+Latest observed results:
+- unit tests: 2/2 passed,
+- reliability checks: 4/4 passed,
+- average confidence: about 0.80.
 
-The system can over-prioritize exact genre matching, which can suppress cross-genre discoveries.
-Because the catalog is tiny, a few songs can dominate multiple profiles.
-The model assumes taste is static and independent of context (time of day, activity, language, social trends).
-There is a filter-bubble risk: users may repeatedly get very similar songs due to deterministic ranking.
-The model does not include fairness constraints, so representation in top-k results depends heavily on feature distribution in the CSV.
+Reliability interpretation:
+- the model is consistent on representative profiles,
+- confidence is useful as an internal stability signal,
+- confidence is **not** equivalent to objective user satisfaction.
 
----
+## 6. Guardrails and Safety
 
-## 7. Evaluation
+Implemented guardrails:
+- clamp normalized numeric values to `[0,1]`,
+- enforce non-negative tempo values,
+- deterministic ranking and safe behavior for invalid `k`.
 
-I evaluated the system with three profiles:
-- High-Energy Pop
-- Chill Lofi
-- Deep Intense Rock
+Operational controls:
+- local-only data processing,
+- transparent explanation strings per recommendation,
+- reproducible test/evaluation scripts.
 
-I checked whether top recommendations aligned with expected vibe and whether reasons made sense.
-I also ran a sensitivity experiment by doubling energy weight and halving genre weight.
-In that experiment, Rooftop Lights moved above Gym Hero for the pop profile, showing ranking sensitivity to weight design.
-I also ran unit tests (`python -m pytest`), and all tests passed.
+## 7. Limitations and Bias Risks
 
----
+1. Feature bias
+The model only optimizes the features it sees; unmodeled factors (lyrics, context, language preference) are ignored.
 
-## 8. Future Work
+2. Catalog bias
+Small and imbalanced catalogs can over-represent certain genres/artists in top-k outputs.
 
-1. Add diversity constraints so top-k does not over-repeat artist or genre.
-2. Add multi-mode scoring (genre-first, mood-first, energy-focused).
-3. Add richer features like popularity, release decade, and lyric sentiment.
-4. Learn weights from feedback instead of hard-coding them.
+3. Filter bubble risk
+Exact-match boosts can repeatedly reinforce similar music and reduce exploration.
 
----
+4. Weight sensitivity
+Small changes in weights can shift ranking order substantially.
 
-## 9. Personal Reflection
+## 8. Misuse Risks and Mitigations
 
-The biggest learning moment was seeing how much ranking behavior changes from small weight adjustments.
-AI tooling was useful for drafting structure quickly, but I had to verify import behavior, run tests, and inspect outputs to ensure the logic really matched expectations.
-I was surprised that a simple weighted formula can already feel like a recommender when explanations are shown.
-If I extend this project, I would focus on diversity and feedback loops so recommendations stay useful without getting repetitive.
+Potential misuse:
+- presenting this classroom system as a production-grade recommendation engine,
+- overstating confidence as a guarantee of recommendation quality,
+- using narrow profiles to justify exclusionary content decisions.
+
+Mitigations:
+- clear intended-use statement in documentation,
+- explicit limitation and confidence caveats,
+- transparent feature-level explanations for auditability,
+- recommendation to add diversity constraints before broader deployment.
+
+## 9. Reflection on Testing and Surprises
+
+What surprised me:
+- rankings changed more than expected from modest weight changes,
+- deterministic outputs still required evaluation because intuitive expectations can be wrong.
+
+Main takeaway:
+- reliable AI systems need both algorithm design and systematic testing artifacts.
+
+## 10. Collaboration with AI During Development
+
+Helpful AI suggestion:
+- AI suggested adding a dedicated reliability harness script that runs fixed scenarios and reports pass/fail plus confidence. This improved the project from "demo only" to "measurable system behavior."
+
+Flawed AI suggestion:
+- AI initially suggested running plain `pytest`, which failed in this environment due to module path resolution (`ModuleNotFoundError: src`). The corrected command `python -m pytest -q` worked. This reinforced the need to verify AI suggestions in the real runtime environment.

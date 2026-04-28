@@ -1,0 +1,13 @@
+flowchart LR
+  A[User Profile Input] --> B[Main App src/main.py]
+  B --> C[Catalog Loader load_songs]
+  C --> D[Scoring Engine score_song]
+  D --> E[Top-K Ranker recommend_songs]
+  E --> F[Output with Explanations]
+  F --> G[Human Review Demo Output]
+
+  H[Reliability Harness src/evaluate.py] --> E
+  H --> I[Pass/Fail Checks + Confidence Summary]
+
+  J[Unit Tests tests/test_recommender.py] --> D
+  J --> E
